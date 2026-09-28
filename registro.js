@@ -17,14 +17,16 @@
     '<input id="studentFirst" autocomplete="given-name" maxlength="70" required style="box-sizing:border-box;width:100%;padding:12px;margin:0 0 13px;border:1px solid #94a3b8;border-radius:7px;font:inherit">' +
     '<label for="studentLast" style="display:block;font-weight:700;margin:0 0 5px">Apellidos</label>' +
     '<input id="studentLast" autocomplete="family-name" maxlength="70" required style="box-sizing:border-box;width:100%;padding:12px;border:1px solid #94a3b8;border-radius:7px;font:inherit">' +
-    '<p id="registrationStatus" role="status" style="margin:12px 0 0;font-size:.94rem"></p>';
+    '<p id="registrationStatus" role="status" style="margin:12px 0 0;font-size:.94rem"></p>' +
+    '<button id="retryRegistration" type="button" style="display:none;margin-top:10px">Reintentar conexión</button>';
   startButton.parentElement.before(box);
   const first = box.querySelector('#studentFirst'), last = box.querySelector('#studentLast');
   const status = box.querySelector('#registrationStatus');
+  const retry = box.querySelector('#retryRegistration');
   if (registration) { first.value = registration.firstName || ''; last.value = registration.lastName || ''; }
   startButton.disabled = true;
   status.textContent = 'Consultando disponibilidad de la prueba…';
-  let open = false, busy = false;
+  let open = false, busy = false, checking = false;
 
   function jsonp(op, id) {
     return new Promise((resolve, reject) => {
@@ -43,13 +45,29 @@
     });
   }
   async function check() {
+    if (checking) return;
+    checking = true;
+    open = false;
+    retry.style.display = 'none';
+    startButton.disabled = true;
     try {
-      const state = await jsonp('status');
-      open = !!state.open;
-      status.textContent = state.message || (open ? 'Prueba disponible.' : 'Prueba cerrada.');
-      startButton.disabled = !open;
-    } catch (err) { open = false; status.textContent = err.message; startButton.disabled = true; }
+      for (let attempt = 0; attempt < 3; attempt++) {
+        status.textContent = attempt ? `Reintentando conexión (${attempt + 1}/3)…` : 'Consultando disponibilidad de la prueba…';
+        try {
+          const state = await jsonp('status');
+          open = !!state.open;
+          status.textContent = state.message || (open ? 'Prueba disponible.' : 'Prueba cerrada.');
+          startButton.disabled = !open;
+          return;
+        } catch (err) {
+          if (attempt === 2) throw err;
+          await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)));
+        }
+      }
+    } catch (err) { status.textContent = err.message; retry.style.display = 'inline-block'; }
+    finally { checking = false; }
   }
+  retry.onclick = check;
   check();
   const originalStart = window.start;
   window.start = async function (...args) {
