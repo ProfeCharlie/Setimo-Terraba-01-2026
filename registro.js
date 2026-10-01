@@ -94,6 +94,7 @@
     let note = document.getElementById('privateSaveStatus');
     if (!note) { note = document.createElement('p'); note.id = 'privateSaveStatus'; note.setAttribute('role', 'status'); result.append(note); }
     note.textContent = message;
+    note.hidden = !message;
   }
   let sending = false;
   function send() {
@@ -123,7 +124,7 @@
       if (ok) {
         registration.saved = true;
         localStorage.setItem(storage, JSON.stringify(registration));
-        showSave('Resultado registrado correctamente.');
+        showSave('');
       } else {
         showSave((message || 'Error al guardar.') + ' Pulsa «Reintentar envío».');
         let retry = document.getElementById('retryPrivateSave');
